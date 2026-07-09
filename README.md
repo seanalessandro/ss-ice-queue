@@ -13,11 +13,13 @@ The URD's "Opsi B" (full-code) stack, adapted to run standalone with zero
 external cloud accounts:
 
 - **Next.js (App Router) + TypeScript + Tailwind** for the frontend and API routes.
-- **SQLite via Prisma 7**, using the `@prisma/adapter-better-sqlite3` driver
-  adapter (Prisma 7 requires an explicit driver adapter — there's no more
-  implicit "read `DATABASE_URL`" client). This replaces the URD's suggested
-  Firebase/Supabase: for a single-office, low-traffic tool a local SQLite
-  file needs no hosted database and no API keys to get running.
+- **SQLite via Prisma 7**, using the `@prisma/adapter-libsql` driver adapter
+  (Prisma 7 requires an explicit driver adapter — there's no more implicit
+  "read `DATABASE_URL`" client). Locally this is just a plain file
+  (`file:./dev.db`, no external account needed); in production it points at
+  a free [Turso](https://turso.tech) database instead, since serverless
+  hosts like Vercel have no persistent local disk. Same schema, same code
+  path, either way — see "Deploying" below.
 - **Polling instead of websockets**: the dashboard polls `GET /api/status`
   every 4s. With a handful of concurrent users this is simpler and more
   robust than wiring up Firebase Realtime DB / a socket server, at the cost
@@ -80,7 +82,9 @@ dashboard.
 
 ### Environment variables (`.env`)
 
-- `DATABASE_URL` — defaults to `file:./dev.db` (already set by `prisma init`).
+- `DATABASE_URL` — `file:./dev.db` locally; a `libsql://...` URL in production.
+- `TURSO_AUTH_TOKEN` — only needed in production, when `DATABASE_URL` points
+  at Turso.
 - `SLACK_WEBHOOK_URL` (optional) — an incoming webhook URL to also post
   queue-call notifications to Slack.
 
@@ -89,6 +93,55 @@ dashboard.
 - `npm run build` / `npm run start` — production build.
 - `npx prisma studio` — browse/edit the SQLite data in a GUI.
 - `npx prisma migrate dev --name <name>` — after changing `schema.prisma`.
+
+## Deploying (free): Vercel + Turso
+
+Vercel's free Hobby tier is the natural fit for a Next.js app, but its
+serverless functions have no persistent local disk — so the plain SQLite
+file only works for local dev. [Turso](https://turso.tech) gives you a
+hosted, SQLite-compatible (libSQL) database with a free tier that's
+generous enough for a single office's ice-queue traffic, and Prisma talks
+to it with the same `sqlite` schema and the same `@prisma/adapter-libsql`
+adapter already wired up in `src/lib/db.ts` — no code changes needed to
+deploy.
+
+1. **Create a Turso database** (no credit card required):
+   ```bash
+   curl -sSfL https://get.tur.so/install.sh | bash   # installs the turso CLI
+   turso auth signup                                  # or: turso auth login
+   turso db create icequeue
+   turso db show icequeue --url                       # -> libsql://icequeue-<org>.turso.io
+   turso db tokens create icequeue                     # -> auth token
+   ```
+2. **Apply migrations to it** (run once, and again after future schema changes):
+   ```bash
+   DATABASE_URL="libsql://icequeue-<org>.turso.io?authToken=<token>" \
+     npx prisma migrate deploy
+   ```
+3. **Deploy to Vercel**:
+   ```bash
+   npm i -g vercel   # or use the Vercel dashboard's "Import Project"
+   vercel
+   ```
+   In the Vercel project's Environment Variables settings, add:
+   - `DATABASE_URL` = `libsql://icequeue-<org>.turso.io`
+   - `TURSO_AUTH_TOKEN` = the token from step 1
+   - `SLACK_WEBHOOK_URL` (optional)
+
+   Then `vercel --prod` (or push to the branch Vercel is tracking).
+
+Whenever you change `prisma/schema.prisma`, re-run the step-2 command
+(with the new migration) against the Turso URL before/after deploying —
+Vercel doesn't run migrations for you.
+
+### Alternative: skip Turso entirely
+
+If you'd rather not touch the DB layer, any host that gives you a real,
+always-on Linux box with a persistent disk (e.g. Oracle Cloud's Always
+Free tier) can run this app exactly as committed — `git clone`, `npm ci`,
+`npx prisma migrate deploy`, `npm run build && npm run start` behind a
+reverse proxy — with the local `file:./dev.db` unchanged. The tradeoff is
+you manage the box yourself instead of getting Vercel's push-to-deploy.
 
 ## API routes
 
