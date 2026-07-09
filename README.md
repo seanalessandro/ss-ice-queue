@@ -96,24 +96,34 @@ dashboard.
 
 ## Deploying (free): Vercel + Turso
 
-Deployment is wired to be as hands-off as possible: **Vercel's own GitHub
-integration does the deploying** (no custom Actions workflow, no deploy
-tokens to manage) — you just connect the repo once. A `vercel-build` script
-in `package.json` (`prisma migrate deploy && next build`) makes every
-deploy apply any pending Prisma migrations automatically, so there's no
-separate migration step to remember either.
+**Vercel's own GitHub integration does the deploying** — no custom Actions
+deploy workflow, no Vercel API tokens to manage. You connect the repo once
+and every push to `main` redeploys automatically.
+
+Migrations are the one part that isn't automatic: Prisma's `migrate`
+command only understands local `file:` SQLite connections, not a remote
+`libsql://` URL — the driver adapter in `src/lib/db.ts` only covers the
+app's normal queries at runtime, not the separate migration engine. So the
+schema has to be applied to the Turso database once, directly, with plain
+SQL (see step 1 below) — after that, the deployed app just connects and
+queries it normally, which works fine.
 
 **One-time setup (you'll need to do this part — it requires your own
 accounts):**
 
-1. **Create a free Turso database:**
-   ```bash
-   curl -sSfL https://get.tur.so/install.sh | bash   # installs the turso CLI
-   turso auth signup                                  # or: turso auth login
-   turso db create icequeue
-   turso db show icequeue --url                       # -> libsql://icequeue-<org>.turso.io
-   turso db tokens create icequeue                     # -> auth token
-   ```
+1. **Create a free Turso database** and apply the schema to it:
+   - Sign up at [turso.tech](https://turso.tech) and create a database
+     (call it `icequeue`).
+   - Find its **connection URL** (`libsql://icequeue-<org>.turso.io`) and
+     create an **auth token** — both from the database's page in the
+     dashboard.
+   - Open the database's SQL console / "Studio" tab in the dashboard, and
+     run the contents of
+     [`prisma/migrations/20260709131516_init/migration.sql`](prisma/migrations/20260709131516_init/migration.sql)
+     against it (paste the whole file, or run each `CREATE TABLE`/
+     `CREATE INDEX` statement one at a time if the console only accepts one
+     statement at once). This creates the `User`, `QueueEntry`, and
+     `MachineStatus` tables the app expects.
 2. **Import this GitHub repo into Vercel:** [vercel.com/new](https://vercel.com/new)
    → pick `seanalessandro/ss-ice-queue` → it auto-detects Next.js, no config
    needed.
@@ -128,9 +138,14 @@ accounts):**
    preview deploys share data with production unless you create a second
    Turso database for previews).
 
-Nothing further to do after that — schema changes just need a new
-migration committed (`npx prisma migrate dev --name <name>` locally); the
-next deploy applies it via `vercel-build`.
+**If you change `prisma/schema.prisma` later:** run
+`npx prisma migrate dev --name <name>` locally (against your local
+`file:./dev.db`) to generate the new migration file, commit it, and then
+run that new migration's SQL against the Turso database the same way as
+step 1 above (dashboard SQL console, or `turso db shell icequeue <
+prisma/migrations/<new>/migration.sql` if you have the CLI). The app
+itself doesn't need to run migrations — it only needs the tables to
+already match `schema.prisma`.
 
 ### CI
 
