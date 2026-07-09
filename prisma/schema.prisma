@@ -1,0 +1,53 @@
+// IceQueue data model — see README.md for the workflow this supports.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum MachineState {
+  available
+  processing
+  empty
+}
+
+enum QueueState {
+  waiting
+  called
+  completed
+  skipped
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  contact   String? // Slack ID / WhatsApp number, used by the notifier
+  createdAt DateTime @default(now())
+
+  queueEntries QueueEntry[]
+}
+
+model QueueEntry {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id])
+  status     QueueState @default(waiting)
+  joinedAt   DateTime   @default(now())
+  calledAt   DateTime?
+  completedAt DateTime?
+
+  @@index([status, joinedAt])
+}
+
+// Singleton row (id always "machine") holding the ice machine's current state.
+model MachineStatus {
+  id                String        @id @default("machine")
+  currentStatus     MachineState  @default(available)
+  lastUpdated       DateTime      @updatedAt
+  estimatedReadyAt  DateTime?
+  lastReportedBy    String?
+}
