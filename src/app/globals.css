@@ -53,3 +53,19 @@ body {
 .hover\:animate-ice-wiggle:hover {
   animation: ice-wiggle 0.4s ease-in-out;
 }
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+.confetti-piece {
+  position: fixed;
+  top: 0;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti-fall 1.4s ease-in forwards;
+  pointer-events: none;
+}

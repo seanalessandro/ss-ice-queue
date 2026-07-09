@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { celebrateCalled, stopTitleFlash, unlockAudio } from "@/lib/celebration";
 
 type MachineState = "available" | "processing" | "empty";
 type QueueState = "waiting" | "called" | "completed" | "skipped";
@@ -23,7 +24,6 @@ type Snapshot = {
   queue: QueueEntry[];
 };
 
-const POLL_MS = 4000;
 const NAME_STORAGE_KEY = "iceQueueName";
 
 const STATUS_META: Record<
@@ -86,16 +86,41 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- polling: fetch immediately, then on an interval
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time fetch for fast first paint, before the SSE stream connects
     refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
   }, [refresh]);
+
+  useEffect(() => {
+    const source = new EventSource("/api/status/stream");
+    source.addEventListener("snapshot", (event: MessageEvent<string>) => {
+      setSnapshot(JSON.parse(event.data));
+    });
+    return () => source.close();
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  const hasBaselineRef = useRef(false);
+  const prevStatusRef = useRef<QueueState | null>(null);
+
+  useEffect(() => {
+    if (!snapshot || !name) return;
+    const status = snapshot.queue.find((q) => q.name === name)?.status ?? null;
+
+    if (!hasBaselineRef.current) {
+      hasBaselineRef.current = true;
+    } else if (status === "called" && prevStatusRef.current !== "called") {
+      celebrateCalled();
+    } else if (status !== "called" && prevStatusRef.current === "called") {
+      stopTitleFlash();
+    }
+    prevStatusRef.current = status;
+  }, [snapshot, name]);
+
+  useEffect(() => stopTitleFlash, []);
 
   async function callApi(path: string, body?: Record<string, unknown>) {
     setBusy(true);
@@ -120,6 +145,7 @@ export default function Home() {
     e.preventDefault();
     const trimmed = nameInput.trim();
     if (!trimmed) return;
+    unlockAudio();
     window.localStorage.setItem(NAME_STORAGE_KEY, trimmed);
     setName(trimmed);
   }
