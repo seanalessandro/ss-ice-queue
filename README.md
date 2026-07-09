@@ -96,16 +96,17 @@ dashboard.
 
 ## Deploying (free): Vercel + Turso
 
-Vercel's free Hobby tier is the natural fit for a Next.js app, but its
-serverless functions have no persistent local disk — so the plain SQLite
-file only works for local dev. [Turso](https://turso.tech) gives you a
-hosted, SQLite-compatible (libSQL) database with a free tier that's
-generous enough for a single office's ice-queue traffic, and Prisma talks
-to it with the same `sqlite` schema and the same `@prisma/adapter-libsql`
-adapter already wired up in `src/lib/db.ts` — no code changes needed to
-deploy.
+Deployment is wired to be as hands-off as possible: **Vercel's own GitHub
+integration does the deploying** (no custom Actions workflow, no deploy
+tokens to manage) — you just connect the repo once. A `vercel-build` script
+in `package.json` (`prisma migrate deploy && next build`) makes every
+deploy apply any pending Prisma migrations automatically, so there's no
+separate migration step to remember either.
 
-1. **Create a Turso database** (no credit card required):
+**One-time setup (you'll need to do this part — it requires your own
+accounts):**
+
+1. **Create a free Turso database:**
    ```bash
    curl -sSfL https://get.tur.so/install.sh | bash   # installs the turso CLI
    turso auth signup                                  # or: turso auth login
@@ -113,26 +114,29 @@ deploy.
    turso db show icequeue --url                       # -> libsql://icequeue-<org>.turso.io
    turso db tokens create icequeue                     # -> auth token
    ```
-2. **Apply migrations to it** (run once, and again after future schema changes):
-   ```bash
-   DATABASE_URL="libsql://icequeue-<org>.turso.io?authToken=<token>" \
-     npx prisma migrate deploy
-   ```
-3. **Deploy to Vercel**:
-   ```bash
-   npm i -g vercel   # or use the Vercel dashboard's "Import Project"
-   vercel
-   ```
-   In the Vercel project's Environment Variables settings, add:
-   - `DATABASE_URL` = `libsql://icequeue-<org>.turso.io`
+2. **Import this GitHub repo into Vercel:** [vercel.com/new](https://vercel.com/new)
+   → pick `seanalessandro/ss-ice-queue` → it auto-detects Next.js, no config
+   needed.
+3. **Add environment variables** in the Vercel project's Settings →
+   Environment Variables:
+   - `DATABASE_URL` = `libsql://icequeue-<org>.turso.io` (from step 1)
    - `TURSO_AUTH_TOKEN` = the token from step 1
    - `SLACK_WEBHOOK_URL` (optional)
+4. **Deploy** — click Deploy in Vercel, or just push to `main`. From then
+   on, every push to `main` redeploys automatically, and every PR gets its
+   own preview URL (against the same Turso database, so be mindful that
+   preview deploys share data with production unless you create a second
+   Turso database for previews).
 
-   Then `vercel --prod` (or push to the branch Vercel is tracking).
+Nothing further to do after that — schema changes just need a new
+migration committed (`npx prisma migrate dev --name <name>` locally); the
+next deploy applies it via `vercel-build`.
 
-Whenever you change `prisma/schema.prisma`, re-run the step-2 command
-(with the new migration) against the Turso URL before/after deploying —
-Vercel doesn't run migrations for you.
+### CI
+
+`.github/workflows/ci.yml` runs lint, typecheck, and a production build on
+every push and pull request — independent of the Vercel deploy above, and
+needs no secrets, so it works immediately with no setup.
 
 ### Alternative: skip Turso entirely
 
