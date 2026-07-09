@@ -126,28 +126,61 @@ export default function Home() {
 
   if (!name) {
     return (
-      <main className="flex flex-1 items-center justify-center p-6">
+      <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-linear-to-br from-sky-100 via-cyan-50 to-blue-100 p-6 dark:from-slate-900 dark:via-slate-950 dark:to-blue-950">
+        <span
+          aria-hidden
+          className="animate-ice-bob pointer-events-none absolute left-[8%] top-[15%] text-5xl opacity-70 [animation-delay:-1s]"
+        >
+          🧊
+        </span>
+        <span
+          aria-hidden
+          className="animate-ice-bob pointer-events-none absolute right-[10%] top-[22%] text-4xl opacity-60 [animation-delay:-3s]"
+        >
+          ❄️
+        </span>
+        <span
+          aria-hidden
+          className="animate-ice-bob pointer-events-none absolute left-[14%] bottom-[18%] text-4xl opacity-60 [animation-delay:-2s]"
+        >
+          🧊
+        </span>
+        <span
+          aria-hidden
+          className="animate-ice-bob pointer-events-none absolute right-[13%] bottom-[12%] text-5xl opacity-70 [animation-delay:-4.5s]"
+        >
+          ❄️
+        </span>
+
         <form
           onSubmit={handleSetName}
-          className="w-full max-w-sm space-y-4 rounded-xl border border-black/10 p-6 shadow-sm dark:border-white/10"
+          className="animate-ice-pop relative w-full max-w-sm space-y-5 rounded-3xl border border-white/60 bg-white/80 p-8 text-center shadow-xl backdrop-blur-sm dark:border-white/10 dark:bg-white/5"
         >
-          <h1 className="text-xl font-semibold">🧊 IceQueue</h1>
-          <p className="text-sm text-black/60 dark:text-white/60">
-            Masukkan nama kamu untuk mulai memantau status es batu dan ikut antrean.
-          </p>
+          <div className="text-6xl">🧊</div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-sky-900 dark:text-sky-100">
+              IceQueue
+            </h1>
+            <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+              Siapa nih yang lagi butuh es? Kenalan dulu, yuk! 😄
+            </p>
+          </div>
           <input
             autoFocus
-            className="w-full rounded-md border border-black/20 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
-            placeholder="Nama kamu"
+            className="w-full rounded-full border-2 border-sky-200 bg-white px-4 py-2.5 text-center text-sm font-medium placeholder:text-black/30 focus:border-sky-400 focus:outline-none dark:border-white/20 dark:bg-transparent dark:placeholder:text-white/30"
+            placeholder="Nama kamu siapa?"
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
           />
           <button
             type="submit"
-            className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="hover:animate-ice-wiggle w-full rounded-full bg-linear-to-r from-sky-500 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-sky-500/30 transition-transform hover:scale-105 active:scale-95"
           >
-            Masuk
+            Gaskeun! 🚀
           </button>
+          <p className="text-xs text-black/40 dark:text-white/40">
+            Nama kamu cuma disimpan di HP/laptop ini, kok.
+          </p>
         </form>
       </main>
     );
